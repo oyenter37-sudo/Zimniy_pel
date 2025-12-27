@@ -7,7 +7,7 @@ import random
 from datetime import datetime, timedelta
 
 BOT_TOKEN = "8597327264:AAHBn3QiVZHk8U7JvzyzqioXiNlgYKN7XNQ"
-ADMIN_ID = 7040380265  # Замени на свой ID
+ADMIN_ID = 7040380265
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -41,7 +41,11 @@ def get_user(user_id):
             "last_bonus": None,
             "task_burn_claimed": 0,
             "task_withdraw_claimed": False,
-            "task_2days_claimed": False
+            "task_2days_claimed": False,
+            "snowball_20_claimed": False,
+            "snowball_200_claimed": False,
+            "snowball_2000_claimed": False,
+            "snowball_5000_claimed": False
         }
         save_db(db)
     return db[user_id]
@@ -308,6 +312,7 @@ def claim_tasks(call):
     rewards = 0
     messages = []
     
+    # Проиграть 10 в казино - снимаем 10 за каждое получение
     claims = int(user['casino_lost'] // 10)
     if claims > 0:
         reward = claims * 3
@@ -315,6 +320,7 @@ def claim_tasks(call):
         user['casino_lost'] -= claims * 10
         messages.append(f"📉 Казино: +{reward}🍬")
     
+    # Сжечь (макс 10 раз за всё время) - снимаем использованные
     burn_claims = min(user['burn_count'], 10 - user['task_burn_claimed'])
     if burn_claims > 0:
         reward = burn_claims * 5
@@ -323,16 +329,41 @@ def claim_tasks(call):
         user['task_burn_claimed'] += burn_claims
         messages.append(f"🔥 Сжечь: +{reward}🍬")
     
-    for target in [20, 200, 2000, 5000]:
-        if user['snowballs'] == target:
-            rewards += 0.5
-            messages.append(f"❄️ Слепить {target}: +0.5🍬")
+    # Слепить ровно 20 - одноразовое, снимаем 20
+    if user['snowballs'] >= 20 and not user.get('snowball_20_claimed', False):
+        rewards += 0.5
+        user['snowballs'] -= 20
+        user['snowball_20_claimed'] = True
+        messages.append("❄️ Слепить 20: +0.5🍬")
     
+    # Слепить ровно 200 - одноразовое, снимаем 200
+    if user['snowballs'] >= 200 and not user.get('snowball_200_claimed', False):
+        rewards += 0.5
+        user['snowballs'] -= 200
+        user['snowball_200_claimed'] = True
+        messages.append("❄️ Слепить 200: +0.5🍬")
+    
+    # Слепить ровно 2000 - одноразовое, снимаем 2000
+    if user['snowballs'] >= 2000 and not user.get('snowball_2000_claimed', False):
+        rewards += 0.5
+        user['snowballs'] -= 2000
+        user['snowball_2000_claimed'] = True
+        messages.append("❄️ Слепить 2000: +0.5🍬")
+    
+    # Слепить ровно 5000 - одноразовое, снимаем 5000
+    if user['snowballs'] >= 5000 and not user.get('snowball_5000_claimed', False):
+        rewards += 0.5
+        user['snowballs'] -= 5000
+        user['snowball_5000_claimed'] = True
+        messages.append("❄️ Слепить 5000: +0.5🍬")
+    
+    # Вывести 10 (только 1 раз)
     if user['withdrawn'] >= 10 and not user['task_withdraw_claimed']:
         rewards += 5
         user['task_withdraw_claimed'] = True
         messages.append("♻️ Вывод: +5🍬")
     
+    # Пробыть 2 дня
     first_join = datetime.fromisoformat(user['first_join'])
     if datetime.now() - first_join >= timedelta(days=2) and not user['task_2days_claimed']:
         rewards += 1
