@@ -175,7 +175,7 @@ def burn(call):
     
     bot.edit_message_text(get_main_text() + "\n\n🔥 Сжигание завершено!", call.message.chat.id, call.message.message_id, reply_markup=get_main_keyboard())
 
-@bot.callback_query_handler(func=lambda call: call.data == "casino")
+  @bot.callback_query_handler(func=lambda call: call.data == "casino")
 def casino(call):
     text = """🎰 Казино 60/40 🎰
 
