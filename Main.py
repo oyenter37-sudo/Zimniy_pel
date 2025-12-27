@@ -6,7 +6,7 @@ import os
 import random
 from datetime import datetime, timedelta
 
-BOT_TOKEN = "ВАШ_ТОКЕН_СЮДА"
+BOT_TOKEN = "8597327264:AAHBn3QiVZHk8U7JvzyzqioXiNlgYKN7XNQ"
 ADMIN_ID = 7040380265  # Замени на свой ID
 
 bot = telebot.TeleBot(BOT_TOKEN)
