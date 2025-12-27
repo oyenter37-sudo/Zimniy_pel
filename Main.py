@@ -6,12 +6,11 @@ import os
 import random
 from datetime import datetime, timedelta
 
-BOT_TOKEN = "Токениктут"
-ADMIN_USERNAME = "venter8"
+BOT_TOKEN = "ВАШ_ТОКЕН_СЮДА"
+ADMIN_ID = 7040380265  # Замени на свой ID
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# База данных (JSON файл)
 DB_FILE = "database.json"
 
 def load_db():
@@ -131,6 +130,8 @@ def bonus(call):
     user = get_user(call.from_user.id)
     
     can_claim = True
+    hours = 0
+    minutes = 0
     if user['last_bonus']:
         last = datetime.fromisoformat(user['last_bonus'])
         if datetime.now() - last < timedelta(days=1):
@@ -164,9 +165,10 @@ def extra(call):
     keyboard.add(types.InlineKeyboardButton("Назад ◀️◀️◀️", callback_data="main"))
     
     bot.edit_message_text("📎 Дополнительное меню:", call.message.chat.id, call.message.message_id, reply_markup=keyboard)
-  @bot.callback_query_handler(func=lambda call: call.data == "burn")
+
+@bot.callback_query_handler(func=lambda call: call.data == "burn")
 def burn(call):
-    bot.edit_message_text("🔥 Сжигаем! 🔥 \nОст. 5 минут! 🕜", call.message.chat.id, call.message.message_id)
+    bot.edit_message_text("🔥 Сжигаем! 🔥\nОст. 5 минут! 🕜", call.message.chat.id, call.message.message_id)
     time.sleep(300)
     
     user = get_user(call.from_user.id)
@@ -175,7 +177,7 @@ def burn(call):
     
     bot.edit_message_text(get_main_text() + "\n\n🔥 Сжигание завершено!", call.message.chat.id, call.message.message_id, reply_markup=get_main_keyboard())
 
-  @bot.callback_query_handler(func=lambda call: call.data == "casino")
+@bot.callback_query_handler(func=lambda call: call.data == "casino")
 def casino(call):
     text = """🎰 Казино 60/40 🎰
 
@@ -277,8 +279,6 @@ def top(call):
 
 @bot.callback_query_handler(func=lambda call: call.data == "tasks")
 def tasks(call):
-    user = get_user(call.from_user.id)
-    
     text = """❄️ ЗАДАНИЯ ❄️
 
 📉 Проиграть 10🍬 в каз
@@ -308,7 +308,6 @@ def claim_tasks(call):
     rewards = 0
     messages = []
     
-    # Проиграть 10 в казино
     claims = int(user['casino_lost'] // 10)
     if claims > 0:
         reward = claims * 3
@@ -316,7 +315,6 @@ def claim_tasks(call):
         user['casino_lost'] -= claims * 10
         messages.append(f"📉 Казино: +{reward}🍬")
     
-    # Сжечь (макс 10 раз)
     burn_claims = min(user['burn_count'], 10 - user['task_burn_claimed'])
     if burn_claims > 0:
         reward = burn_claims * 5
@@ -325,19 +323,16 @@ def claim_tasks(call):
         user['task_burn_claimed'] += burn_claims
         messages.append(f"🔥 Сжечь: +{reward}🍬")
     
-    # Слепить ровно 20, 200, 2000, 5000
     for target in [20, 200, 2000, 5000]:
         if user['snowballs'] == target:
             rewards += 0.5
             messages.append(f"❄️ Слепить {target}: +0.5🍬")
     
-    # Вывести 10 (только 1 раз)
     if user['withdrawn'] >= 10 and not user['task_withdraw_claimed']:
         rewards += 5
         user['task_withdraw_claimed'] = True
         messages.append("♻️ Вывод: +5🍬")
     
-    # Пробыть 2 дня
     first_join = datetime.fromisoformat(user['first_join'])
     if datetime.now() - first_join >= timedelta(days=2) and not user['task_2days_claimed']:
         rewards += 1
@@ -403,7 +398,6 @@ def withdraw_id(message, user_id, amount):
     
     hedgehogs = int(amount * 10)
     
-    # Отправка админу
     admin_text = f"""📥 ЗАЯВКА НА ВЫВОД
 
 👤 От: @{message.from_user.username or 'Без юзернейма'}
@@ -417,14 +411,7 @@ def withdraw_id(message, user_id, amount):
         types.InlineKeyboardButton("❌ Отклонить", callback_data=f"decline_{user_id}_{amount}")
     )
     
-    try:
-        for admin in bot.get_chat_administrators(message.chat.id):
-            if admin.user.username == ADMIN_USERNAME:
-                bot.send_message(admin.user.id, admin_text, reply_markup=admin_keyboard)
-    except:
-        pass
-    
-    # Отправляем напрямую админу по юзернейму (нужен chat_id)
+    bot.send_message(ADMIN_ID, admin_text, reply_markup=admin_keyboard)
     bot.send_message(message.chat.id, "✅ Заявка отправлена! Ожидай подтверждения от админа.", reply_markup=get_main_keyboard())
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("accept_"))
@@ -445,7 +432,6 @@ def decline_withdraw(call):
     user_id = parts[1]
     amount = float(parts[2])
     
-    # Возврат конфет
     user = get_user(user_id)
     user['balance'] += amount
     user['withdrawn'] -= amount
