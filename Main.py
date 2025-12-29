@@ -6,7 +6,7 @@ import os
 import random
 import string
 from datetime import datetime, timedelta
-from pillow import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import io
 
 BOT_TOKEN = "8597327264:AAHBn3QiVZHk8U7JvzyzqioXiNlgYKN7XNQ"
