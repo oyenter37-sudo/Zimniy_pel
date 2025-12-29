@@ -8,6 +8,7 @@ import string
 from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import io
+import math
 
 BOT_TOKEN = "8597327264:AAHBn3QiVZHk8U7JvzyzqioXiNlgYKN7XNQ"
 ADMIN_ID = 7040380265
@@ -16,47 +17,6 @@ bot = telebot.TeleBot(BOT_TOKEN)
 
 DB_FILE = "database.json"
 PROMO_FILE = "promocodes.json"
-FONT_PATH = "fonts/Comfortaa-Bold.ttf"
-GENERATED_DIR = "generated"
-MAX_FOLDER_SIZE_MB = 50
-
-if not os.path.exists(GENERATED_DIR):
-    os.makedirs(GENERATED_DIR)
-
-# ==================== ОЧИСТКА ПАПКИ ====================
-
-def get_folder_size_mb(folder):
-    total_size = 0
-    for file in os.listdir(folder):
-        file_path = os.path.join(folder, file)
-        if os.path.isfile(file_path):
-            total_size += os.path.getsize(file_path)
-    return total_size / (1024 * 1024)
-
-def cleanup_old_images():
-    if not os.path.exists(GENERATED_DIR):
-        return
-    
-    while get_folder_size_mb(GENERATED_DIR) > MAX_FOLDER_SIZE_MB:
-        files = []
-        for file in os.listdir(GENERATED_DIR):
-            file_path = os.path.join(GENERATED_DIR, file)
-            if os.path.isfile(file_path):
-                files.append((file_path, os.path.getmtime(file_path)))
-        
-        if not files:
-            break
-        
-        # Сортируем по времени (старые первые)
-        files.sort(key=lambda x: x[1])
-        
-        # Удаляем самый старый файл
-        oldest_file = files[0][0]
-        try:
-            os.remove(oldest_file)
-            print(f"🗑️ Удалён старый файл: {oldest_file}")
-        except:
-            break
 
 # ==================== БАЗА ДАННЫХ ====================
 
@@ -117,6 +77,26 @@ def update_user(user_id, data):
 
 # ==================== ГЕНЕРАЦИЯ КАРТИНОК ====================
 
+def get_font(size):
+    # Пробуем системные шрифты с поддержкой русского
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",   # Linux
+        "C:/Windows/Fonts/arial.ttf",                              # Windows
+        "C:/Windows/Fonts/arialbd.ttf",                            # Windows Bold
+        "/System/Library/Fonts/Helvetica.ttc",                     # Mac
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",               # Arch Linux
+    ]
+    
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except:
+                continue
+    
+    return ImageFont.load_default()
+
 def draw_blurred_circles(img, num_circles=8):
     overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
@@ -143,7 +123,6 @@ def draw_snowflakes(img, num_flakes=15):
         size = random.randint(10, 30)
         alpha = random.randint(100, 200)
         
-        import math
         for angle in range(0, 360, 60):
             end_x = x + size * math.cos(math.radians(angle))
             end_y = y + size * math.sin(math.radians(angle))
@@ -154,9 +133,6 @@ def draw_snowflakes(img, num_flakes=15):
     return img
 
 def create_promo_image(promo_code, amount, uses):
-    # Проверяем и очищаем папку
-    cleanup_old_images()
-    
     width, height = 800, 500
     
     img = Image.new('RGBA', (width, height), (30, 60, 150, 255))
@@ -166,8 +142,8 @@ def create_promo_image(promo_code, amount, uses):
     blurred_bg = img.copy().filter(ImageFilter.GaussianBlur(radius=15))
     
     plash_margin = 50
-    plash_top = 100
-    plash_bottom = height - 80
+    plash_top = 80
+    plash_bottom = height - 60
     plash_area = (plash_margin, plash_top, width - plash_margin, plash_bottom)
     
     blurred_crop = blurred_bg.crop(plash_area)
@@ -179,14 +155,9 @@ def create_promo_image(promo_code, amount, uses):
     draw = ImageDraw.Draw(img)
     draw.rectangle(plash_area, outline=(255, 255, 255, 150), width=3)
     
-    try:
-        font_title = ImageFont.truetype(FONT_PATH, 32)
-        font_code = ImageFont.truetype(FONT_PATH, 56)
-        font_info = ImageFont.truetype(FONT_PATH, 28)
-    except:
-        font_title = ImageFont.load_default()
-        font_code = ImageFont.load_default()
-        font_info = ImageFont.load_default()
+    font_title = get_font(44)
+    font_code = get_font(72)
+    font_info = get_font(38)
     
     title = f"Промокод на {amount} конфет!"
     title_bbox = draw.textbbox((0, 0), title, font=font_title)
@@ -195,7 +166,7 @@ def create_promo_image(promo_code, amount, uses):
     
     code_bbox = draw.textbbox((0, 0), promo_code, font=font_code)
     code_width = code_bbox[2] - code_bbox[0]
-    draw.text(((width - code_width) // 2, plash_top + 120), promo_code, font=font_code, fill=(255, 220, 100, 255))
+    draw.text(((width - code_width) // 2, plash_top + 110), promo_code, font=font_code, fill=(255, 220, 100, 255))
     
     uses_text = f"Активаций: {uses}"
     uses_bbox = draw.textbbox((0, 0), uses_text, font=font_info)
@@ -210,9 +181,6 @@ def create_promo_image(promo_code, amount, uses):
     return img_bytes
 
 def create_text_image(text):
-    # Проверяем и очищаем папку
-    cleanup_old_images()
-    
     width, height = 800, 600
     padding = 60
     
@@ -241,15 +209,11 @@ def create_text_image(text):
     max_width = width - padding * 2 - 80
     max_height = height - padding * 2 - 80
     
-    font_size = 60
+    font_size = 80
     lines = []
     
-    while font_size > 16:
-        try:
-            font = ImageFont.truetype(FONT_PATH, font_size)
-        except:
-            font = ImageFont.load_default()
-            break
+    while font_size > 20:
+        font = get_font(font_size)
         
         lines = []
         words = text.split()
@@ -267,29 +231,26 @@ def create_text_image(text):
         if current_line:
             lines.append(current_line)
         
-        line_height = font_size + 10
+        line_height = font_size + 15
         total_height = len(lines) * line_height
         
         if total_height <= max_height:
             break
         
-        font_size -= 4
+        font_size -= 5
     
-    try:
-        font = ImageFont.truetype(FONT_PATH, font_size)
-    except:
-        font = ImageFont.load_default()
+    font = get_font(font_size)
     
-    total_height = len(lines) * (font_size + 10)
+    total_height = len(lines) * (font_size + 15)
     start_y = (height - total_height) // 2
     
     for i, line in enumerate(lines):
         bbox = draw.textbbox((0, 0), line, font=font)
         line_width = bbox[2] - bbox[0]
         x = (width - line_width) // 2
-        y = start_y + i * (font_size + 10)
+        y = start_y + i * (font_size + 15)
         
-        draw.text((x + 2, y + 2), line, font=font, fill=(0, 0, 50, 150))
+        draw.text((x + 3, y + 3), line, font=font, fill=(0, 0, 50, 150))
         draw.text((x, y), line, font=font, fill=(255, 255, 255, 255))
     
     img_bytes = io.BytesIO()
@@ -785,7 +746,9 @@ def create_promo_uses(message, user_id, amount):
         save_promos(promos)
         
         img = create_promo_image(promo_code, amount, uses)
-        bot.send_photo(message.chat.id, img, caption=f"✅ Промокод создан!\n\n🎫 Код: `{promo_code}`\n💰 Награда: {amount} 🍬\n🔢 Активаций: {uses}\n💸 Списано: {total_cost} 🍬", parse_mode="Markdown", reply_markup=get_main_keyboard())
+        
+        bot.send_photo(message.chat.id, img)
+        bot.send_message(message.chat.id, f"✅ Промокод создан!\n\n🎫 Код: `{promo_code}`\n💰 Награда: {amount} 🍬\n🔢 Активаций: {uses}\n💸 Списано: {total_cost} 🍬", parse_mode="Markdown", reply_markup=get_main_keyboard())
         
         admin_text = f"""🆕 НОВЫЙ ПРОМОКОД
 
@@ -859,7 +822,9 @@ def generate_text_finish(message):
         return
     
     img = create_text_image(text)
-    bot.send_photo(message.chat.id, img, reply_markup=get_main_keyboard())
+    
+    bot.send_photo(message.chat.id, img)
+    bot.send_message(message.chat.id, "🖼️ Готово!", reply_markup=get_main_keyboard())
 
 # ==================== НАЙДИ КОНФЕТУ ====================
 
@@ -885,8 +850,8 @@ def find_candy(call):
     for i in ones:
         cells[i] = 1
     
-    remaining = [i for i in range(25) if i not in ones]
-    five = random.choice(remaining)
+    remaining_cells = [i for i in range(25) if i not in ones]
+    five = random.choice(remaining_cells)
     cells[five] = 5
     
     attempts = random.choice([1, 2])
@@ -951,7 +916,8 @@ def cell_click(call):
         bot.edit_message_text(f"❄️ Найди 🍬❄️\n\n+{reward} 🍬!\nОсталось попыток: {game['attempts']}", call.message.chat.id, call.message.message_id, reply_markup=keyboard)
     else:
         user['last_find_candy'] = datetime.now().isoformat()
-        del user['find_candy_game']
+        if 'find_candy_game' in user:
+            del user['find_candy_game']
         update_user(call.from_user.id, user)
         
         total = sum(game['cells'][i] for i in game['opened'])
